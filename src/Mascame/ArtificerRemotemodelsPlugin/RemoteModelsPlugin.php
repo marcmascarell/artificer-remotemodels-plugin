@@ -1,84 +1,87 @@
-<?php namespace Mascame\ArtificerRemotemodelsPlugin;
+<?php
+
+namespace Mascame\ArtificerRemotemodelsPlugin;
 
 use Mascame\Artificer\Artificer;
 use Mascame\Artificer\Plugin\AbstractPlugin;
 
+class RemoteModelsPlugin extends AbstractPlugin
+{
+    protected $destination_path;
+    protected $remoteModels = [];
 
-class RemoteModelsPlugin extends AbstractPlugin {
+    /**
+     * @var \Closure
+     */
+    protected $afterFetchClosure;
 
-	protected $destination_path;
-	protected $remoteModels = array();
+    public function meta()
+    {
+        $this->version = '1.0';
+        $this->name = 'Remote Models';
+        $this->description = 'Provides remote models';
+        $this->author = 'Marc Mascarell';
+    }
 
-	/**
-	 * @var \Closure
-	 */
-	protected $afterFetchClosure;
+    public function boot()
+    {
+        $this->destination_path = $this->option->get('destination_path').DIRECTORY_SEPARATOR;
+        $this->afterFetchClosure = $this->option->get('after_fetch');
 
-	public function meta()
-	{
-		$this->version = '1.0';
-		$this->name = 'Remote Models';
-		$this->description = 'Provides remote models';
-		$this->author = 'Marc Mascarell';
-	}
+        if ($fingerprint = $this->checkFingerprint()) {
+            $this->setFingerprint($fingerprint);
 
-	public function boot()
-	{
-		$this->destination_path = $this->option->get('destination_path') . DIRECTORY_SEPARATOR;
-		$this->afterFetchClosure = $this->option->get('after_fetch');
+            $this->remoteModels = $this->getRemoteModels();
 
-    	if ($fingerprint = $this->checkFingerprint()) {
-			$this->setFingerprint($fingerprint);
+            foreach ($this->remoteModels as $model) {
+                $this->putModel($model);
+            }
+        }
+    }
 
-			$this->remoteModels = $this->getRemoteModels();
+    /**
+     * The fingerprint is used in order to avoid refetching files if it is not necessary.
+     *
+     * @return bool|string
+     */
+    public function checkFingerprint()
+    {
+        $url = $this->option->get('remote_fingerprint_url');
 
-			foreach ($this->remoteModels as $model) {
-				$this->putModel($model);
-			}
-		}
-	}
+        $remote_fingerprint = \File::get($url);
+        $fingerprint = \File::get($this->destination_path.'fingerprint.json');
 
-	/**
-	 * The fingerprint is used in order to avoid refetching files if it is not necessary
-	 *
-	 * @return bool|string
-	 */
-	public function checkFingerprint()
-	{
-		$url = $this->option->get('remote_fingerprint_url');
+        if ($remote_fingerprint == $fingerprint) {
+            return false;
+        }
 
-		$remote_fingerprint = \File::get($url);
-		$fingerprint = \File::get($this->destination_path . 'fingerprint.json');
+        return $fingerprint;
+    }
 
-		if ($remote_fingerprint == $fingerprint) {
-			return false;
-		}
+    /**
+     * @param $fingerprint
+     */
+    protected function setFingerprint($fingerprint)
+    {
+        Artificer::store(
+            $this->destination_path.'fingerprint.json',
+            json_encode(['fingerprint' => $fingerprint])
+        );
+    }
 
-		return $fingerprint;
-	}
+    /**
+     * @param $model
+     */
+    public function putModel($model)
+    {
+        $url = str_replace(':model', $model, app_path('remote_getmodel_url'));
+        $file_contents = \File::get($url);
 
-	/**
-	 * @param $fingerprint
-	 */
-	protected function setFingerprint($fingerprint) {
-		Artificer::store(
-			$this->destination_path . 'fingerprint.json',
-			json_encode(array('fingerprint' => $fingerprint))
-		);
-	}
+        Artificer::store($this->destination_path.$model, $this->afterFetchClosure($file_contents));
+    }
 
-	/**
-	 * @param $model
-	 */
-	public function putModel($model) {
-		$url = str_replace(':model', $model, app_path('remote_getmodel_url'));
-		$file_contents = \File::get($url);
-
-		Artificer::store($this->destination_path . $model, $this->afterFetchClosure($file_contents));
-	}
-
-	protected function getRemoteModels() {
-		return json_decode(\File::get(app_path('remote_getmodels_url')), true);
-	}
-
+    protected function getRemoteModels()
+    {
+        return json_decode(\File::get(app_path('remote_getmodels_url')), true);
+    }
 }

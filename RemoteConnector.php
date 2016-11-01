@@ -1,35 +1,38 @@
-<?php namespace Mascame;
+<?php
 
+namespace Mascame;
 
-class RemoteConnector {
-
+class RemoteConnector
+{
     protected $path;
-    protected $models = array();
+    protected $models = [];
 
     /**
      * @param $path
      */
-    public function __construct($path) {
+    public function __construct($path)
+    {
         $this->path = $path;
         $this->models = $this->getModels($path);
-
     }
 
     /**
      * @param null $path
      * @return array
      */
-    public function getModels($path = null) {
-        if ($this->models != null) return $this->models;
+    public function getModels($path = null)
+    {
+        if ($this->models != null) {
+            return $this->models;
+        }
 
-        $models = array();
+        $models = [];
 
         $iterator = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($path));
 
         $iterator->rewind();
-        while($iterator->valid()) {
-
-            if (!$iterator->isDot()) {
+        while ($iterator->valid()) {
+            if (! $iterator->isDot()) {
                 $models[$iterator->getFilename()] = $iterator->getRealPath();
             }
 
@@ -43,14 +46,16 @@ class RemoteConnector {
      * @param $model
      * @return string
      */
-    public function getModelFile($model) {
+    public function getModelFile($model)
+    {
         return file_get_contents($this->models[$model]);
     }
 
     /**
      * @return string
      */
-    public function getFingerPrint() {
+    public function getFingerPrint()
+    {
         $fingerprint = 0;
 
         foreach ($this->models as $model) {
